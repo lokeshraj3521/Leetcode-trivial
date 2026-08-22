@@ -42,6 +42,24 @@ export default function Profile({ userId }) {
   const hardCount = stats.hard_count || 0;
   const totalSolved = easyCount + medCount + hardCount;
 
+  const totalEasyPool = 960;
+  const totalMedPool = 2103;
+  const totalHardPool = 966;
+  const totalQuestionPool = 4029;
+
+  // Donut Arc Calculations (circumference = 100)
+  const safeTotal = totalSolved > 0 ? totalSolved : 1;
+  const easyPct = (easyCount / safeTotal) * 100;
+  const medPct = (medCount / safeTotal) * 100;
+  const hardPct = (hardCount / safeTotal) * 100;
+
+  const easyDash = `${easyPct} ${100 - easyPct}`;
+  const medDash = `${medPct} ${100 - medPct}`;
+  const hardDash = `${hardPct} ${100 - hardPct}`;
+
+  const medOffset = -easyPct;
+  const hardOffset = -(easyPct + medPct);
+
   const skills = profile.skills_breakdown || {};
   const languages = profile.languages_breakdown || [];
 
@@ -83,12 +101,13 @@ export default function Profile({ userId }) {
         </div>
       </div>
 
-      {/* LeetCode Solved Ring & Breakdown */}
+      {/* LeetCode Multi-Color Solved Donut & Breakdown */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Solved Donut Summary Card */}
+        {/* Authentic Multi-Segment Solved Donut Summary Card */}
         <div className="bg-[#282828] p-6 rounded-2xl border border-[#3e3e3e] flex items-center justify-around shadow-lg">
-          <div className="relative w-32 h-32 flex items-center justify-center">
+          <div className="relative w-36 h-36 flex items-center justify-center">
             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+              {/* Background Track */}
               <path
                 className="text-[#3e3e3e]"
                 strokeWidth="3.5"
@@ -96,37 +115,86 @@ export default function Profile({ userId }) {
                 fill="none"
                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
               />
-              <path
-                className="text-[#ffa116]"
-                strokeDasharray={`${Math.min(100, (totalSolved / 4029) * 100 * 10)}, 100`}
-                strokeWidth="3.5"
-                strokeLinecap="round"
-                stroke="currentColor"
-                fill="none"
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-              />
+
+              {/* Easy Segment (Green) */}
+              {easyCount > 0 && (
+                <circle
+                  cx="18"
+                  cy="18"
+                  r="15.9155"
+                  fill="none"
+                  stroke="#00b8a3"
+                  strokeWidth="3.5"
+                  strokeDasharray={easyDash}
+                  strokeDashoffset="0"
+                  strokeLinecap="round"
+                />
+              )}
+
+              {/* Medium Segment (Yellow) */}
+              {medCount > 0 && (
+                <circle
+                  cx="18"
+                  cy="18"
+                  r="15.9155"
+                  fill="none"
+                  stroke="#ffc01e"
+                  strokeWidth="3.5"
+                  strokeDasharray={medDash}
+                  strokeDashoffset={medOffset}
+                  strokeLinecap="round"
+                />
+              )}
+
+              {/* Hard Segment (Red) */}
+              {hardCount > 0 && (
+                <circle
+                  cx="18"
+                  cy="18"
+                  r="15.9155"
+                  fill="none"
+                  stroke="#ff375f"
+                  strokeWidth="3.5"
+                  strokeDasharray={hardDash}
+                  strokeDashoffset={hardOffset}
+                  strokeLinecap="round"
+                />
+              )}
             </svg>
+
+            {/* Center Solved Numbers */}
             <div className="absolute text-center">
-              <div className="text-2xl font-black text-white">{totalSolved}</div>
-              <div className="text-[10px] uppercase font-extrabold text-[#d1d5db]">SOLVED</div>
+              <div className="text-2xl font-black text-white">{totalSolved}<span className="text-xs font-semibold text-[#9ca3af]">/{totalQuestionPool}</span></div>
+              <div className="text-[10px] uppercase font-black text-[#00b8a3] flex items-center justify-center gap-1">
+                <span>✓ Solved</span>
+              </div>
             </div>
           </div>
 
-          <div className="space-y-2 text-xs font-bold">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#00b8a3]"></span>
-              <span className="text-[#d1d5db]">Easy:</span>
-              <span className="text-white font-extrabold text-sm">{easyCount}</span>
+          {/* Right Stats Breakdown Cards (Easy/960, Med/2103, Hard/966) */}
+          <div className="space-y-2.5 text-xs font-extrabold">
+            <div className="p-2 bg-[#1a1a1a] rounded-xl border border-[#3e3e3e] flex items-center justify-between gap-3 min-w-[110px]">
+              <div className="flex items-center gap-1.5 text-[#00b8a3]">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#00b8a3]"></span>
+                <span>Easy</span>
+              </div>
+              <span className="text-white font-black">{easyCount}<span className="text-[#9ca3af] font-normal text-[11px]">/{totalEasyPool}</span></span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#ffc01e]"></span>
-              <span className="text-[#d1d5db]">Medium:</span>
-              <span className="text-white font-extrabold text-sm">{medCount}</span>
+
+            <div className="p-2 bg-[#1a1a1a] rounded-xl border border-[#3e3e3e] flex items-center justify-between gap-3 min-w-[110px]">
+              <div className="flex items-center gap-1.5 text-[#ffc01e]">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#ffc01e]"></span>
+                <span>Med.</span>
+              </div>
+              <span className="text-white font-black">{medCount}<span className="text-[#9ca3af] font-normal text-[11px]">/{totalMedPool}</span></span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#ff375f]"></span>
-              <span className="text-[#d1d5db]">Hard:</span>
-              <span className="text-white font-extrabold text-sm">{hardCount}</span>
+
+            <div className="p-2 bg-[#1a1a1a] rounded-xl border border-[#3e3e3e] flex items-center justify-between gap-3 min-w-[110px]">
+              <div className="flex items-center gap-1.5 text-[#ff375f]">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#ff375f]"></span>
+                <span>Hard</span>
+              </div>
+              <span className="text-white font-black">{hardCount}<span className="text-[#9ca3af] font-normal text-[11px]">/{totalHardPool}</span></span>
             </div>
           </div>
         </div>
@@ -161,7 +229,7 @@ export default function Profile({ userId }) {
       {/* 365-day Heatmap */}
       <Heatmap userId={userId} />
 
-      {/* Authentic LeetCode Languages & Skills Section */}
+      {/* Authentic LeetCode Languages & Skills Section (Fundamental -> Intermediate -> Advanced) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Languages Card */}
         <div className="bg-[#282828] p-6 rounded-2xl border border-[#3e3e3e] space-y-4 shadow-lg">
@@ -187,57 +255,57 @@ export default function Profile({ userId }) {
           )}
         </div>
 
-        {/* Skills Breakdown Card (Advanced, Intermediate, Fundamental) */}
+        {/* Skills Matrix Card (Fundamental -> Intermediate -> Advanced) */}
         <div className="md:col-span-2 bg-[#282828] p-6 rounded-2xl border border-[#3e3e3e] space-y-5 shadow-lg">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
             <Cpu className="w-4 h-4 text-[#ffa116]" />
             LeetCode Official Skills Matrix
           </h3>
 
-          <div className="space-y-4">
-            {/* Advanced Category */}
-            {skills.advanced && skills.advanced.length > 0 && (
-              <div className="space-y-2">
-                <div className="text-xs font-extrabold text-rose-400 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-rose-500"></span> Advanced
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {skills.advanced.map((tag, idx) => (
-                    <span key={idx} className="bg-[#1a1a1a] border border-[#3e3e3e] hover:border-[#ffa116]/50 text-xs px-3 py-1.5 rounded-xl font-bold text-gray-200 flex items-center gap-1.5">
-                      <span>{tag.tagName}</span>
-                      <span className="text-[#ffa116] font-mono font-extrabold">x{tag.problemsSolved}</span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Intermediate Category */}
-            {skills.intermediate && skills.intermediate.length > 0 && (
-              <div className="space-y-2">
-                <div className="text-xs font-extrabold text-amber-400 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-amber-400"></span> Intermediate
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {skills.intermediate.map((tag, idx) => (
-                    <span key={idx} className="bg-[#1a1a1a] border border-[#3e3e3e] hover:border-[#ffa116]/50 text-xs px-3 py-1.5 rounded-xl font-bold text-gray-200 flex items-center gap-1.5">
-                      <span>{tag.tagName}</span>
-                      <span className="text-[#ffa116] font-mono font-extrabold">x{tag.problemsSolved}</span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Fundamental Category */}
+          <div className="space-y-5">
+            {/* 1. Fundamental Category (Top) */}
             {skills.fundamental && skills.fundamental.length > 0 && (
               <div className="space-y-2">
-                <div className="text-xs font-extrabold text-emerald-400 flex items-center gap-1.5">
+                <div className="text-xs font-extrabold text-emerald-400 flex items-center gap-1.5 uppercase tracking-wider">
                   <span className="w-2 h-2 rounded-full bg-emerald-400"></span> Fundamental
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {skills.fundamental.map((tag, idx) => (
-                    <span key={idx} className="bg-[#1a1a1a] border border-[#3e3e3e] hover:border-[#ffa116]/50 text-xs px-3 py-1.5 rounded-xl font-bold text-gray-200 flex items-center gap-1.5">
+                    <span key={idx} className="bg-[#1a1a1a] border border-[#3e3e3e] hover:border-[#ffa116]/50 text-xs px-3 py-1.5 rounded-xl font-bold text-gray-200 flex items-center gap-1.5 transition-colors">
+                      <span>{tag.tagName}</span>
+                      <span className="text-[#ffa116] font-mono font-extrabold">x{tag.problemsSolved}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 2. Intermediate Category (Middle) */}
+            {skills.intermediate && skills.intermediate.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-xs font-extrabold text-amber-400 flex items-center gap-1.5 uppercase tracking-wider">
+                  <span className="w-2 h-2 rounded-full bg-amber-400"></span> Intermediate
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {skills.intermediate.map((tag, idx) => (
+                    <span key={idx} className="bg-[#1a1a1a] border border-[#3e3e3e] hover:border-[#ffa116]/50 text-xs px-3 py-1.5 rounded-xl font-bold text-gray-200 flex items-center gap-1.5 transition-colors">
+                      <span>{tag.tagName}</span>
+                      <span className="text-[#ffa116] font-mono font-extrabold">x{tag.problemsSolved}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 3. Advanced Category (Bottom) */}
+            {skills.advanced && skills.advanced.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-xs font-extrabold text-rose-400 flex items-center gap-1.5 uppercase tracking-wider">
+                  <span className="w-2 h-2 rounded-full bg-rose-500"></span> Advanced
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {skills.advanced.map((tag, idx) => (
+                    <span key={idx} className="bg-[#1a1a1a] border border-[#3e3e3e] hover:border-[#ffa116]/50 text-xs px-3 py-1.5 rounded-xl font-bold text-gray-200 flex items-center gap-1.5 transition-colors">
                       <span>{tag.tagName}</span>
                       <span className="text-[#ffa116] font-mono font-extrabold">x{tag.problemsSolved}</span>
                     </span>
