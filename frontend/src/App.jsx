@@ -5,18 +5,20 @@ import Profile from './components/Profile';
 import Groups from './components/Groups';
 import AIInsights from './components/AIInsights';
 import NotificationFeed from './components/NotificationFeed';
-import NewUserModal from './components/NewUserModal';
+import LoginModal from './components/LoginModal';
 import { apiUsers, apiGroups, apiSync, apiNotifications } from './services/api';
 
 export default function App() {
   const [users, setUsers] = useState([]);
   const [groups, setGroups] = useState([]);
-  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(() => {
+    return localStorage.getItem('leetcode_tracker_user_id') || null;
+  });
   const [selectedGroupId, setSelectedGroupId] = useState(null);
   const [activeTab, setActiveTab] = useState('leaderboard');
   const [isSyncing, setIsSyncing] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [newUserModalOpen, setNewUserModalOpen] = useState(false);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
 
   useEffect(() => {
@@ -24,10 +26,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (selectedUserId) {
+    if (currentUserId) {
+      localStorage.setItem('leetcode_tracker_user_id', currentUserId);
       loadNotificationCount();
+    } else if (users.length > 0) {
+      setLoginModalOpen(true);
     }
-  }, [selectedUserId]);
+  }, [currentUserId, users]);
 
   const loadInitialData = async () => {
     try {
@@ -35,8 +40,8 @@ export default function App() {
       setUsers(usersData);
       setGroups(groupsData);
 
-      if (usersData.length > 0 && !selectedUserId) {
-        setSelectedUserId(usersData[0].id);
+      if (!currentUserId && usersData.length > 0) {
+        setLoginModalOpen(true);
       }
     } catch (err) {
       console.error('Error initializing application data:', err);
@@ -44,8 +49,9 @@ export default function App() {
   };
 
   const loadNotificationCount = async () => {
+    if (!currentUserId) return;
     try {
-      const feed = await apiNotifications.getUserFeed(selectedUserId);
+      const feed = await apiNotifications.getUserFeed(currentUserId);
       setNotificationCount(feed.length);
     } catch (err) {
       console.error('Failed to load notification count:', err);
@@ -53,10 +59,10 @@ export default function App() {
   };
 
   const handleSync = async () => {
-    if (!selectedUserId) return;
+    if (!currentUserId) return;
     setIsSyncing(true);
     try {
-      await apiSync.syncUser(selectedUserId);
+      await apiSync.syncUser(currentUserId);
       await loadInitialData();
       await loadNotificationCount();
     } catch (err) {
@@ -66,18 +72,25 @@ export default function App() {
     }
   };
 
-  const handleUserCreated = (newUser) => {
-    setUsers((prev) => [newUser, ...prev]);
-    setSelectedUserId(newUser.id);
+  const handleLoginSuccess = (user) => {
+    if (!users.some((u) => u.id === user.id)) {
+      setUsers((prev) => [user, ...prev]);
+    }
+    setCurrentUserId(user.id);
+    setLoginModalOpen(false);
   };
 
+  const handleSwitchAccount = () => {
+    setLoginModalOpen(true);
+  };
+
+  const currentUser = users.find((u) => u.id === currentUserId);
+
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-gray-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#1a1a1a] text-gray-100 flex flex-col font-sans">
       <Header
-        users={users}
+        currentUser={currentUser}
         groups={groups}
-        selectedUserId={selectedUserId}
-        setSelectedUserId={setSelectedUserId}
         selectedGroupId={selectedGroupId}
         setSelectedGroupId={setSelectedGroupId}
         activeTab={activeTab}
@@ -86,31 +99,31 @@ export default function App() {
         isSyncing={isSyncing}
         notificationCount={notificationCount}
         onOpenNotifications={() => setNotificationsOpen(true)}
-        onOpenNewUserModal={() => setNewUserModalOpen(true)}
+        onSwitchAccount={handleSwitchAccount}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'leaderboard' && (
-          <Leaderboard selectedGroupId={selectedGroupId} selectedUserId={selectedUserId} />
+          <Leaderboard selectedGroupId={selectedGroupId} currentUserId={currentUserId} />
         )}
-        {activeTab === 'profile' && <Profile userId={selectedUserId} />}
+        {activeTab === 'profile' && <Profile userId={currentUserId} />}
         {activeTab === 'groups' && (
-          <Groups groups={groups} selectedUserId={selectedUserId} onRefreshGroups={loadInitialData} />
+          <Groups groups={groups} currentUserId={currentUserId} onRefreshGroups={loadInitialData} />
         )}
-        {activeTab === 'ai' && <AIInsights userId={selectedUserId} />}
+        {activeTab === 'ai' && <AIInsights userId={currentUserId} />}
       </main>
 
-      {/* Drawer & Modal Popups */}
+      {/* Login & Notification Modals */}
+      <LoginModal
+        isOpen={loginModalOpen}
+        users={users}
+        onLoginSuccess={handleLoginSuccess}
+      />
+
       <NotificationFeed
         isOpen={notificationsOpen}
         onClose={() => setNotificationsOpen(false)}
-        userId={selectedUserId}
-      />
-
-      <NewUserModal
-        isOpen={newUserModalOpen}
-        onClose={() => setNewUserModalOpen(false)}
-        onUserCreated={handleUserCreated}
+        userId={currentUserId}
       />
     </div>
   );

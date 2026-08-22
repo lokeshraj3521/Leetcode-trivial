@@ -8,16 +8,17 @@ export default {
   theme: {
     extend: {
       colors: {
-        dark: {
-          bg: '#0B0F19',
-          card: '#111827',
-          border: '#1F2937',
-          muted: '#374151',
-        },
-        leetcode: {
-          easy: '#00B8A3',
-          medium: '#FFC01E',
-          hard: '#FF375F',
+        lc: {
+          bg: '#1a1a1a',
+          card: '#282828',
+          cardHover: '#323232',
+          border: '#3e3e3e',
+          orange: '#ffa116',
+          orangeDark: '#ff8c00',
+          easy: '#00b8a3',
+          medium: '#ffc01e',
+          hard: '#ff375f',
+          textMuted: '#9e9e9e',
         }
       }
     },
