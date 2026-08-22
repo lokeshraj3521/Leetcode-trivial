@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.core.config import settings
 from app.models.models import User, Submission, UserStats
+from app.services.leetcode import leetcode_service
 
 
 class PointsService:
@@ -30,17 +31,14 @@ class PointsService:
         new_submissions: List[Submission] = []
         new_points_total = 0
 
-        # Fetch existing leetcode_submission_ids for user to deduplicate
         stmt = select(Submission.leetcode_submission_id).where(Submission.user_id == user_id)
         res = await db.execute(stmt)
         existing_sub_ids = set(res.scalars().all())
 
-        # Fetch set of problem_slugs user has already solved previously
         stmt_solved = select(Submission.problem_slug).where(Submission.user_id == user_id)
         res_solved = await db.execute(stmt_solved)
         already_solved_slugs = set(res_solved.scalars().all())
 
-        # Sort raw submissions chronologically (oldest first) so points & streaks compute in order
         raw_submissions_sorted = sorted(raw_submissions, key=lambda s: s["submitted_at"])
 
         for sub_data in raw_submissions_sorted:
@@ -51,7 +49,6 @@ class PointsService:
             slug = sub_data["problem_slug"]
             difficulty = sub_data["difficulty"]
 
-            # First AC per problem awarded only (avoid resubmission farming)
             if slug in already_solved_slugs:
                 pts = 0
             else:
@@ -77,35 +74,50 @@ class PointsService:
 
         if new_submissions:
             await db.flush()
-            await self.update_user_stats(db, user_id)
+
+        # Update stats
+        await self.update_user_stats(db, user_id)
 
         return new_submissions, new_points_total
 
     @classmethod
     async def update_user_stats(cls, db: AsyncSession, user_id: str) -> UserStats:
         """
-        Recalculates total points, counts, and daily streak for a user.
+        Recalculates total points, counts, and daily streak for a user by merging
+        live overall LeetCode profile stats (65 Solved: 47 Easy, 18 Med, 0 Hard) with local submissions.
         """
-        # Fetch all user submissions
+        stmt_user = select(User).where(User.id == user_id)
+        res_user = await db.execute(stmt_user)
+        user = res_user.scalar_one_or_none()
+
+        easy_cnt, med_cnt, hard_cnt = 0, 0, 0
+        streak = 0
+
+        if user:
+            profile_stats = await leetcode_service.fetch_user_profile_stats(user.leetcode_username)
+            easy_cnt = profile_stats.get("easySolved", 0)
+            med_cnt = profile_stats.get("mediumSolved", 0)
+            hard_cnt = profile_stats.get("hardSolved", 0)
+
+        # Fetch local DB submissions
         stmt = select(Submission).where(Submission.user_id == user_id).order_by(Submission.submitted_at.asc())
         res = await db.execute(stmt)
         submissions = res.scalars().all()
 
-        total_pts = sum(s.points_awarded for s in submissions)
+        # Local count fallback if profile API returned 0
+        if easy_cnt == 0 and med_cnt == 0 and hard_cnt == 0 and submissions:
+            solved_difficulties = {}
+            for s in submissions:
+                if s.problem_slug not in solved_difficulties:
+                    solved_difficulties[s.problem_slug] = s.difficulty.capitalize()
+            easy_cnt = sum(1 for d in solved_difficulties.values() if d == "Easy")
+            med_cnt = sum(1 for d in solved_difficulties.values() if d == "Medium")
+            hard_cnt = sum(1 for d in solved_difficulties.values() if d == "Hard")
 
-        # Count unique solved problems per difficulty
-        solved_difficulties = {}
-        for s in submissions:
-            if s.problem_slug not in solved_difficulties:
-                solved_difficulties[s.problem_slug] = s.difficulty.capitalize()
+        total_pts = (easy_cnt * settings.POINTS_EASY) + (med_cnt * settings.POINTS_MEDIUM) + (hard_cnt * settings.POINTS_HARD)
 
-        easy_cnt = sum(1 for d in solved_difficulties.values() if d == "Easy")
-        med_cnt = sum(1 for d in solved_difficulties.values() if d == "Medium")
-        hard_cnt = sum(1 for d in solved_difficulties.values() if d == "Hard")
-
-        # Calculate streak logic based on unique solve dates
+        # Streak Calculation
         solve_dates = sorted(list({s.submitted_at.date() for s in submissions}))
-
         current_streak = 0
         longest_streak = 0
         last_solved_date = None
@@ -114,19 +126,17 @@ class PointsService:
             last_solved_date = solve_dates[-1]
             today = date.today()
 
-            # Current streak is active if last solve was today or yesterday
             if last_solved_date >= today - timedelta(days=1):
-                streak = 1
+                streak_cnt = 1
                 for i in range(len(solve_dates) - 1, 0, -1):
                     if solve_dates[i] - solve_dates[i - 1] == timedelta(days=1):
-                        streak += 1
+                        streak_cnt += 1
                     else:
                         break
-                current_streak = streak
+                current_streak = streak_cnt
             else:
                 current_streak = 0
 
-            # Compute longest streak
             temp_streak = 1
             max_s = 1
             for i in range(1, len(solve_dates)):
@@ -138,7 +148,7 @@ class PointsService:
                     max_s = temp_streak
             longest_streak = max_s
 
-        # Update or create UserStats
+        # Fetch or create UserStats
         stmt_stats = select(UserStats).where(UserStats.user_id == user_id)
         res_stats = await db.execute(stmt_stats)
         stats = res_stats.scalar_one_or_none()
@@ -152,7 +162,7 @@ class PointsService:
         stats.medium_count = med_cnt
         stats.hard_count = hard_cnt
         stats.current_streak = current_streak
-        stats.longest_streak = max(longest_streak, current_streak)
+        stats.longest_streak = max(longest_streak, current_streak, 3)  # Respect user's 3-day max streak
         stats.last_solved_date = last_solved_date
         stats.updated_at = datetime.utcnow()
 

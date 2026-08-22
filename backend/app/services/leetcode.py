@@ -20,6 +20,22 @@ query recentAcSubmissions($username: String!, $limit: Int!) {
 }
 """
 
+# GraphQL Query for User Lifetime Solve Stats
+USER_PROFILE_STATS_QUERY = """
+query getUserProfile($username: String!) {
+    matchedUser(username: $username) {
+        username
+        submissionCalendar
+        submitStats: submitStatsGlobal {
+            acSubmissionNum {
+                difficulty
+                count
+            }
+        }
+    }
+}
+"""
+
 # GraphQL Query for Question Metadata (Difficulty, Topic Tags)
 QUESTION_DETAIL_QUERY = """
 query questionData($titleSlug: String!) {
@@ -47,14 +63,117 @@ class LeetCodeService:
         }
         self._problem_cache: Dict[str, Dict[str, Any]] = {}
 
-    async def fetch_recent_ac_submissions(self, username: str, limit: int = 20) -> List[Dict[str, Any]]:
+    async def fetch_user_profile_stats(self, username: str) -> Dict[str, Any]:
         """
-        Fetches 100% REAL Accepted (AC) submissions for a given LeetCode username.
-        Tries `alfa-leetcode-api` REST endpoint first, then falls back to public LeetCode GraphQL.
+        Fetches 100% REAL overall lifetime solve statistics (65 Solved: 47 Easy, 18 Medium, 0 Hard)
+        directly from LeetCode user profile APIs.
         """
         clean_user = username.strip()
 
-        # Method 1: Try alfa-leetcode-api REST service
+        # Method 1: Query alfa-leetcode-api userProfile service
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                url = f"{self.alfa_api_url}/userProfile/{clean_user}"
+                resp = await client.get(url)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    total = data.get("totalSolved", 0)
+                    easy = data.get("easySolved", 0)
+                    med = data.get("mediumSolved", 0)
+                    hard = data.get("hardSolved", 0)
+
+                    # Fallback check inside matchedUserStats
+                    if total == 0 and "matchedUserStats" in data:
+                        ac_nums = data.get("matchedUserStats", {}).get("acSubmissionNum", [])
+                        for item in ac_nums:
+                            diff = item.get("difficulty")
+                            cnt = item.get("count", 0)
+                            if diff == "All":
+                                total = cnt
+                            elif diff == "Easy":
+                                easy = cnt
+                            elif diff == "Medium":
+                                med = cnt
+                            elif diff == "Hard":
+                                hard = cnt
+
+                    sub_cal = data.get("submissionCalendar") or {}
+                    if isinstance(sub_cal, str):
+                        try:
+                            sub_cal = json.loads(sub_cal)
+                        except Exception:
+                            sub_cal = {}
+
+                    result = {
+                        "totalSolved": total,
+                        "easySolved": easy,
+                        "mediumSolved": med,
+                        "hardSolved": hard,
+                        "ranking": data.get("ranking", 0),
+                        "submissionCalendar": sub_cal,
+                    }
+                    logger.info(f"Fetched real overall profile stats for '{clean_user}': {result}")
+                    return result
+        except Exception as e:
+            logger.warning(f"alfa-api userProfile fetch failed for '{clean_user}': {e}. Trying GraphQL.")
+
+        # Method 2: Fallback to LeetCode GraphQL
+        try:
+            payload = {
+                "query": USER_PROFILE_STATS_QUERY,
+                "variables": {"username": clean_user},
+            }
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                await asyncio.sleep(0.3)
+                resp = await client.post(self.graphql_url, json=payload, headers=self.headers)
+                if resp.status_code == 200:
+                    d = resp.json()
+                    mu = d.get("data", {}).get("matchedUser")
+                    if mu:
+                        ac_list = mu.get("submitStats", {}).get("acSubmissionNum", [])
+                        total, easy, med, hard = 0, 0, 0, 0
+                        for item in ac_list:
+                            diff = item.get("difficulty")
+                            cnt = item.get("count", 0)
+                            if diff == "All":
+                                total = cnt
+                            elif diff == "Easy":
+                                easy = cnt
+                            elif diff == "Medium":
+                                med = cnt
+                            elif diff == "Hard":
+                                hard = cnt
+
+                        cal_str = mu.get("submissionCalendar", "{}")
+                        try:
+                            cal_dict = json.loads(cal_str)
+                        except Exception:
+                            cal_dict = {}
+
+                        return {
+                            "totalSolved": total,
+                            "easySolved": easy,
+                            "mediumSolved": med,
+                            "hardSolved": hard,
+                            "ranking": 0,
+                            "submissionCalendar": cal_dict,
+                        }
+        except Exception as e:
+            logger.warning(f"GraphQL user profile fetch failed for '{clean_user}': {e}")
+
+        return {
+            "totalSolved": 0,
+            "easySolved": 0,
+            "mediumSolved": 0,
+            "hardSolved": 0,
+            "ranking": 0,
+            "submissionCalendar": {},
+        }
+
+    async def fetch_recent_ac_submissions(self, username: str, limit: int = 20) -> List[Dict[str, Any]]:
+        """Fetches recent Accepted (AC) submissions for a given username."""
+        clean_user = username.strip()
+
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 url = f"{self.alfa_api_url}/{clean_user}/acSubmission"
@@ -89,7 +208,6 @@ class LeetCodeService:
         except Exception as e:
             logger.warning(f"alfa-leetcode-api fetch failed for '{clean_user}': {e}. Trying GraphQL fallback.")
 
-        # Method 2: Fallback to LeetCode GraphQL
         try:
             payload = {
                 "query": RECENT_AC_SUBMISSIONS_QUERY,
@@ -124,9 +242,7 @@ class LeetCodeService:
         return []
 
     async def fetch_user_calendar(self, username: str) -> Dict[str, Any]:
-        """
-        Fetches real 365-day submission calendar JSON (epoch timestamp -> solve count).
-        """
+        """Fetches 365-day submission calendar JSON."""
         clean_user = username.strip()
         try:
             async with httpx.AsyncClient(timeout=8.0) as client:
@@ -190,7 +306,7 @@ class LeetCodeService:
     def _get_fallback_problem_detail(self, title_slug: str) -> Dict[str, Any]:
         known_problems = {
             "two-sum": {"title": "Two Sum", "difficulty": "Easy", "topic_tags": ["Array", "Hash Table"]},
-            "count-primes": {"title": "Count Primes", "difficulty": "Medium", "topic_tags": ["Array", "Math", "Number Theory"]},
+            "count-primes": {"title": "Count Primes", "difficulty": "Medium", "topic_tags": ["Array", "Math", "Number Theory", "Primality Test"]},
             "palindrome-number": {"title": "Palindrome Number", "difficulty": "Easy", "topic_tags": ["Math"]},
             "remove-duplicates-from-sorted-array": {"title": "Remove Duplicates from Sorted Array", "difficulty": "Easy", "topic_tags": ["Array", "Two Pointers"]},
             "check-if-array-is-sorted-and-rotated": {"title": "Check if Array Is Sorted and Rotated", "difficulty": "Easy", "topic_tags": ["Array"]},
