@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,30 +28,46 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return False
 
 
+def format_phone_number(raw_phone: str) -> str:
+    """
+    Normalizes phone numbers for all international countries.
+    If 10 digits without country code, defaults to +91.
+    If '+' is provided, preserves exact international format.
+    """
+    if not raw_phone:
+        return ""
+    cleaned = raw_phone.strip()
+    digits = re.sub(r"\D", "", cleaned)
+
+    if cleaned.startswith("+"):
+        return f"+{digits}"
+    elif len(digits) == 10:
+        return f"+91{digits}"
+    return f"+{digits}" if digits else cleaned
+
+
 @router.post("/register", response_model=UserProfileResponse, status_code=status.HTTP_201_CREATED)
 async def register(user_in: UserRegister, db: AsyncSession = Depends(get_db)):
     """Registers or updates a user account with password, phone number, and display name."""
     clean_username = user_in.leetcode_username.strip()
 
-    # Case-insensitive check if user exists
     stmt = select(User).where(func.lower(User.leetcode_username) == clean_username.lower())
     res = await db.execute(stmt)
     existing_user = res.scalar_one_or_none()
 
     pw_hash = hash_password(user_in.password)
+    formatted_phone = format_phone_number(user_in.phone_number) if user_in.phone_number else None
 
     if existing_user:
-        # If user exists, update their details (password, display_name, phone_number, email)
         if user_in.display_name:
             existing_user.display_name = user_in.display_name.strip()
         if user_in.email:
             existing_user.email = user_in.email.strip()
-        if user_in.phone_number:
-            existing_user.phone_number = user_in.phone_number.strip()
+        if formatted_phone:
+            existing_user.phone_number = formatted_phone
         existing_user.password_hash = pw_hash
         user = existing_user
     else:
-        # Verify username validity on LeetCode for brand new user
         profile_stats = await leetcode_service.fetch_user_profile_stats(clean_username)
         if profile_stats.get("totalSolved") == 0 and profile_stats.get("easySolved") == 0:
             recent = await leetcode_service.fetch_recent_ac_submissions(clean_username, limit=1)
@@ -66,7 +83,7 @@ async def register(user_in: UserRegister, db: AsyncSession = Depends(get_db)):
             leetcode_username=clean_username,
             display_name=user_in.display_name.strip(),
             email=user_in.email.strip() if user_in.email else None,
-            phone_number=user_in.phone_number.strip() if user_in.phone_number else None,
+            phone_number=formatted_phone,
             password_hash=pw_hash,
             created_at=datetime.utcnow(),
         )
@@ -120,7 +137,6 @@ async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)):
             detail=f"Account '{clean_username}' not found. Please click 'Register with your LeetCode ID' below.",
         )
 
-    # Password validation
     if user.password_hash:
         if not verify_password(credentials.password, user.password_hash):
             raise HTTPException(
