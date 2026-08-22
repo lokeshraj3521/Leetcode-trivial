@@ -38,11 +38,12 @@ async def create_user(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
     db.add(stats)
     await db.flush()
 
-    # Trigger immediate live sync
     raw_subs = await leetcode_service.fetch_recent_ac_submissions(clean_username, limit=20)
     if raw_subs:
         await points_service.process_new_submissions(db, user.id, raw_subs)
-        user.last_synced_at = datetime.utcnow()
+    
+    await points_service.update_user_stats(db, user.id)
+    user.last_synced_at = datetime.utcnow()
 
     await db.commit()
     await db.refresh(user)
@@ -69,6 +70,10 @@ async def get_user_profile(user_id: str, db: AsyncSession = Depends(get_db)):
     stmt_stats = select(UserStats).where(UserStats.user_id == user_id)
     res_stats = await db.execute(stmt_stats)
     stats = res_stats.scalar_one_or_none()
+
+    if not stats or (stats.easy_count == 0 and stats.medium_count == 0 and stats.hard_count == 0):
+        stats = await points_service.update_user_stats(db, user_id)
+        await db.commit()
 
     stmt_subs = select(Submission).where(Submission.user_id == user_id)
     res_subs = await db.execute(stmt_subs)
@@ -102,14 +107,12 @@ async def get_user_heatmap(user_id: str, db: AsyncSession = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
 
-    # Fetch DB local submissions
     stmt_subs = select(Submission).where(Submission.user_id == user_id)
     res_subs = await db.execute(stmt_subs)
     submissions = res_subs.scalars().all()
 
     daily_map: Dict[str, Dict[str, int]] = {}
 
-    # 1. Map local DB submissions
     for s in submissions:
         day_str = s.submitted_at.strftime("%Y-%m-%d")
         if day_str not in daily_map:
@@ -125,7 +128,6 @@ async def get_user_heatmap(user_id: str, db: AsyncSession = Depends(get_db)):
         elif diff == "Hard":
             daily_map[day_str]["hard"] += 1
 
-    # 2. Map real LeetCode API calendar data
     real_cal = await leetcode_service.fetch_user_calendar(user.leetcode_username)
     sub_cal = real_cal.get("submissionCalendar") or {}
 
