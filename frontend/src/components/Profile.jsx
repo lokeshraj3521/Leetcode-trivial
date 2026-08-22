@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User as UserIcon, Zap, Flame, Award, Tag, CheckCircle2, Clock, Code, Cpu } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Sector } from 'recharts';
 import Heatmap from './Heatmap';
 import { apiUsers, apiSubmissions } from '../services/api';
 
@@ -7,6 +8,7 @@ export default function Profile({ userId }) {
   const [profile, setProfile] = useState(null);
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
     if (userId) loadProfileData();
@@ -47,18 +49,41 @@ export default function Profile({ userId }) {
   const totalHardPool = 966;
   const totalQuestionPool = 4029;
 
-  // Donut Arc Calculations (circumference = 100)
-  const safeTotal = totalSolved > 0 ? totalSolved : 1;
-  const easyPct = (easyCount / safeTotal) * 100;
-  const medPct = (medCount / safeTotal) * 100;
-  const hardPct = (hardCount / safeTotal) * 100;
+  // Recharts Data
+  const chartData = [
+    { name: 'Easy', value: easyCount, color: '#00b8a3', totalPool: totalEasyPool },
+    { name: 'Medium', value: medCount, color: '#ffc01e', totalPool: totalMedPool },
+    { name: 'Hard', value: hardCount, color: '#ff375f', totalPool: totalHardPool },
+  ];
 
-  const easyDash = `${easyPct} ${100 - easyPct}`;
-  const medDash = `${medPct} ${100 - medPct}`;
-  const hardDash = `${hardPct} ${100 - hardPct}`;
+  const renderData = chartData.map(d => d.value > 0 ? d : { ...d, value: 0.001 });
 
-  const medOffset = -easyPct;
-  const hardOffset = -(easyPct + medPct);
+  // Custom Active Shape renderer for Recharts pie chart
+  const renderActiveShape = (props) => {
+    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
+    return (
+      <g>
+        <Sector
+          cx={cx}
+          cy={cy}
+          innerRadius={innerRadius}
+          outerRadius={outerRadius + 6}
+          startAngle={startAngle}
+          endAngle={endAngle}
+          fill={fill}
+        />
+        <Sector
+          cx={cx}
+          cy={cy}
+          innerRadius={outerRadius + 9}
+          outerRadius={outerRadius + 12}
+          startAngle={startAngle}
+          endAngle={endAngle}
+          fill={fill}
+        />
+      </g>
+    );
+  };
 
   const skills = profile.skills_breakdown || {};
   const languages = profile.languages_breakdown || [];
@@ -101,79 +126,49 @@ export default function Profile({ userId }) {
         </div>
       </div>
 
-      {/* LeetCode Multi-Color Solved Donut & Breakdown */}
+      {/* Interactive Recharts Solved Donut & Breakdown */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Authentic Multi-Segment Solved Donut Summary Card */}
+        {/* Interactive Pie Chart Card */}
         <div className="bg-[#282828] p-6 rounded-2xl border border-[#3e3e3e] flex items-center justify-around shadow-lg">
-          <div className="relative w-36 h-36 flex items-center justify-center">
-            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-              {/* Background Track */}
-              <path
-                className="text-[#3e3e3e]"
-                strokeWidth="3.5"
-                stroke="currentColor"
-                fill="none"
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-              />
+          <div className="relative w-44 h-44 flex items-center justify-center">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  activeIndex={activeIndex}
+                  activeShape={renderActiveShape}
+                  data={renderData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={52}
+                  outerRadius={68}
+                  dataKey="value"
+                  onMouseEnter={(_, index) => setActiveIndex(index)}
+                  stroke="none"
+                >
+                  {renderData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
 
-              {/* Easy Segment (Green) */}
-              {easyCount > 0 && (
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="15.9155"
-                  fill="none"
-                  stroke="#00b8a3"
-                  strokeWidth="3.5"
-                  strokeDasharray={easyDash}
-                  strokeDashoffset="0"
-                  strokeLinecap="round"
-                />
-              )}
-
-              {/* Medium Segment (Yellow) */}
-              {medCount > 0 && (
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="15.9155"
-                  fill="none"
-                  stroke="#ffc01e"
-                  strokeWidth="3.5"
-                  strokeDasharray={medDash}
-                  strokeDashoffset={medOffset}
-                  strokeLinecap="round"
-                />
-              )}
-
-              {/* Hard Segment (Red) */}
-              {hardCount > 0 && (
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="15.9155"
-                  fill="none"
-                  stroke="#ff375f"
-                  strokeWidth="3.5"
-                  strokeDasharray={hardDash}
-                  strokeDashoffset={hardOffset}
-                  strokeLinecap="round"
-                />
-              )}
-            </svg>
-
-            {/* Center Solved Numbers */}
-            <div className="absolute text-center">
+            {/* Center Label */}
+            <div className="absolute text-center pointer-events-none">
               <div className="text-2xl font-black text-white">{totalSolved}<span className="text-xs font-semibold text-[#9ca3af]">/{totalQuestionPool}</span></div>
               <div className="text-[10px] uppercase font-black text-[#00b8a3] flex items-center justify-center gap-1">
-                <span>✓ Solved</span>
+                <span>✓ SOLVED</span>
               </div>
             </div>
           </div>
 
-          {/* Right Stats Breakdown Cards (Easy/960, Med/2103, Hard/966) */}
+          {/* Right Stats Breakdown Cards */}
           <div className="space-y-2.5 text-xs font-extrabold">
-            <div className="p-2 bg-[#1a1a1a] rounded-xl border border-[#3e3e3e] flex items-center justify-between gap-3 min-w-[110px]">
+            <div
+              onMouseEnter={() => setActiveIndex(0)}
+              className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 min-w-[120px] ${
+                activeIndex === 0 ? 'bg-[#00b8a3]/15 border-[#00b8a3]' : 'bg-[#1a1a1a] border-[#3e3e3e]'
+              }`}
+            >
               <div className="flex items-center gap-1.5 text-[#00b8a3]">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#00b8a3]"></span>
                 <span>Easy</span>
@@ -181,7 +176,12 @@ export default function Profile({ userId }) {
               <span className="text-white font-black">{easyCount}<span className="text-[#9ca3af] font-normal text-[11px]">/{totalEasyPool}</span></span>
             </div>
 
-            <div className="p-2 bg-[#1a1a1a] rounded-xl border border-[#3e3e3e] flex items-center justify-between gap-3 min-w-[110px]">
+            <div
+              onMouseEnter={() => setActiveIndex(1)}
+              className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 min-w-[120px] ${
+                activeIndex === 1 ? 'bg-[#ffc01e]/15 border-[#ffc01e]' : 'bg-[#1a1a1a] border-[#3e3e3e]'
+              }`}
+            >
               <div className="flex items-center gap-1.5 text-[#ffc01e]">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#ffc01e]"></span>
                 <span>Med.</span>
@@ -189,7 +189,12 @@ export default function Profile({ userId }) {
               <span className="text-white font-black">{medCount}<span className="text-[#9ca3af] font-normal text-[11px]">/{totalMedPool}</span></span>
             </div>
 
-            <div className="p-2 bg-[#1a1a1a] rounded-xl border border-[#3e3e3e] flex items-center justify-between gap-3 min-w-[110px]">
+            <div
+              onMouseEnter={() => setActiveIndex(2)}
+              className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 min-w-[120px] ${
+                activeIndex === 2 ? 'bg-[#ff375f]/15 border-[#ff375f]' : 'bg-[#1a1a1a] border-[#3e3e3e]'
+              }`}
+            >
               <div className="flex items-center gap-1.5 text-[#ff375f]">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#ff375f]"></span>
                 <span>Hard</span>
@@ -229,7 +234,7 @@ export default function Profile({ userId }) {
       {/* 365-day Heatmap */}
       <Heatmap userId={userId} />
 
-      {/* Authentic LeetCode Languages & Skills Section (Fundamental -> Intermediate -> Advanced) */}
+      {/* Authentic LeetCode Languages & Skills Section */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Languages Card */}
         <div className="bg-[#282828] p-6 rounded-2xl border border-[#3e3e3e] space-y-4 shadow-lg">
@@ -263,7 +268,7 @@ export default function Profile({ userId }) {
           </h3>
 
           <div className="space-y-5">
-            {/* 1. Fundamental Category (Top) */}
+            {/* Fundamental Category */}
             {skills.fundamental && skills.fundamental.length > 0 && (
               <div className="space-y-2">
                 <div className="text-xs font-extrabold text-emerald-400 flex items-center gap-1.5 uppercase tracking-wider">
@@ -280,7 +285,7 @@ export default function Profile({ userId }) {
               </div>
             )}
 
-            {/* 2. Intermediate Category (Middle) */}
+            {/* Intermediate Category */}
             {skills.intermediate && skills.intermediate.length > 0 && (
               <div className="space-y-2">
                 <div className="text-xs font-extrabold text-amber-400 flex items-center gap-1.5 uppercase tracking-wider">
@@ -297,7 +302,7 @@ export default function Profile({ userId }) {
               </div>
             )}
 
-            {/* 3. Advanced Category (Bottom) */}
+            {/* Advanced Category */}
             {skills.advanced && skills.advanced.length > 0 && (
               <div className="space-y-2">
                 <div className="text-xs font-extrabold text-rose-400 flex items-center gap-1.5 uppercase tracking-wider">
