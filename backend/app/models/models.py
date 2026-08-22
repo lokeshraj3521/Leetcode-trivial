@@ -17,6 +17,8 @@ class User(Base):
     leetcode_username: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
     display_name: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    phone_number: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -39,6 +41,7 @@ class Group(Base):
 
     # Relationships
     members: Mapped[List["GroupMember"]] = relationship("GroupMember", back_populates="group", cascade="all, delete-orphan")
+    messages: Mapped[List["GroupMessage"]] = relationship("GroupMessage", back_populates="group", cascade="all, delete-orphan")
 
 
 class GroupMember(Base):
@@ -55,6 +58,20 @@ class GroupMember(Base):
     # Relationships
     group: Mapped["Group"] = relationship("Group", back_populates="members")
     user: Mapped["User"] = relationship("User", back_populates="group_memberships")
+
+
+class GroupMessage(Base):
+    __tablename__ = "group_messages"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    group_id: Mapped[str] = mapped_column(String(36), ForeignKey("groups.id"), index=True, nullable=False)
+    sender_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
+    sender_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    content: Mapped[str] = mapped_column(String(1000), nullable=False)
+    sent_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+    # Relationships
+    group: Mapped["Group"] = relationship("Group", back_populates="messages")
 
 
 class Submission(Base):
@@ -124,7 +141,7 @@ class AIInsight(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=False)
-    insight_type: Mapped[str] = mapped_column(String(50), nullable=False)  # 'weak_topics', 'weekly_recap', 'next_problem'
+    insight_type: Mapped[str] = mapped_column(String(50), nullable=False)
     content: Mapped[Any] = mapped_column(JSON, nullable=False)
     generated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     valid_until: Mapped[datetime] = mapped_column(DateTime, nullable=False)

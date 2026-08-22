@@ -18,6 +18,12 @@ async function request(endpoint, options = {}) {
   return response.json();
 }
 
+// Auth API
+export const apiAuth = {
+  register: (data) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+  login: (data) => request('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+};
+
 // User API
 export const apiUsers = {
   list: () => request('/users/'),
@@ -31,6 +37,12 @@ export const apiGroups = {
   list: () => request('/groups/'),
   create: (data) => request('/groups/', { method: 'POST', body: JSON.stringify(data) }),
   join: (data) => request('/groups/join', { method: 'POST', body: JSON.stringify(data) }),
+};
+
+// Messages API
+export const apiMessages = {
+  listGroupMessages: (groupId) => request(`/messages/group/${groupId}`),
+  sendGroupMessage: (groupId, data) => request(`/messages/group/${groupId}`, { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // Leaderboard API

@@ -84,6 +84,16 @@ export default function App() {
     setLoginModalOpen(true);
   };
 
+  const handleGroupCreated = (newGroup) => {
+    setGroups((prev) => [newGroup, ...prev]);
+  };
+
+  const handleGroupJoined = (joinedGroup) => {
+    if (!groups.some((g) => g.id === joinedGroup.id)) {
+      setGroups((prev) => [joinedGroup, ...prev]);
+    }
+  };
+
   const currentUser = users.find((u) => u.id === currentUserId);
 
   return (
@@ -108,7 +118,12 @@ export default function App() {
         )}
         {activeTab === 'profile' && <Profile userId={currentUserId} />}
         {activeTab === 'groups' && (
-          <Groups groups={groups} currentUserId={currentUserId} onRefreshGroups={loadInitialData} />
+          <Groups
+            currentUser={currentUser}
+            groups={groups}
+            onGroupCreated={handleGroupCreated}
+            onGroupJoined={handleGroupJoined}
+          />
         )}
         {activeTab === 'ai' && <AIInsights userId={currentUserId} />}
       </main>
@@ -116,7 +131,6 @@ export default function App() {
       {/* Login & Notification Modals */}
       <LoginModal
         isOpen={loginModalOpen}
-        users={users}
         onLoginSuccess={handleLoginSuccess}
       />
 

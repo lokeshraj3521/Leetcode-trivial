@@ -3,11 +3,25 @@ from datetime import datetime, date
 from typing import List, Optional, Any, Dict
 
 
-# --- User Schemas ---
-class UserCreate(BaseModel):
+# --- Auth & User Schemas ---
+class UserRegister(BaseModel):
     leetcode_username: str = Field(..., min_length=1, max_length=100, description="LeetCode public username")
-    display_name: str = Field(..., min_length=1, max_length=100, description="Display name for leaderboards")
+    display_name: str = Field(..., min_length=1, max_length=100, description="Display name")
     email: Optional[EmailStr] = None
+    phone_number: Optional[str] = Field(None, max_length=30, description="Optional phone number for notifications")
+    password: str = Field(..., min_length=4, max_length=100, description="Account password")
+
+
+class UserLogin(BaseModel):
+    leetcode_username: str = Field(..., min_length=1, max_length=100)
+    password: str = Field(..., min_length=1, max_length=100)
+
+
+class UserCreate(BaseModel):
+    leetcode_username: str = Field(..., min_length=1, max_length=100)
+    display_name: str = Field(..., min_length=1, max_length=100)
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
 
 
 class UserStatsSchema(BaseModel):
@@ -28,6 +42,7 @@ class UserResponse(BaseModel):
     leetcode_username: str
     display_name: str
     email: Optional[str] = None
+    phone_number: Optional[str] = None
     created_at: datetime
     last_synced_at: Optional[datetime] = None
     is_active: bool
@@ -61,6 +76,23 @@ class GroupResponse(BaseModel):
     created_by: str
     created_at: datetime
     member_count: int = 0
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# --- Group Message Schemas ---
+class GroupMessageCreate(BaseModel):
+    sender_id: str
+    content: str = Field(..., min_length=1, max_length=1000)
+
+
+class GroupMessageResponse(BaseModel):
+    id: str
+    group_id: str
+    sender_id: str
+    sender_name: str
+    content: str
+    sent_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
