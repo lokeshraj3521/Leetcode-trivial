@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trophy, Users, Sparkles, Bell, RefreshCw, Flame, LogOut, User } from 'lucide-react';
+import { Trophy, Users, Sparkles, Bell, RefreshCw, Flame, LogOut } from 'lucide-react';
 
 export default function Header({
   currentUser,
@@ -18,7 +18,7 @@ export default function Header({
     <header className="bg-[#282828] border-b border-[#3e3e3e] sticky top-0 z-30 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         
-        {/* LeetCode Authentic Brand Logo */}
+        {/* LeetCode Brand Logo */}
         <div className="flex items-center gap-3 shrink-0">
           <div className="w-9 h-9 bg-[#1a1a1a] border border-[#3e3e3e] rounded-xl flex items-center justify-center shadow-inner">
             <svg className="w-5 h-5 fill-[#ffa116]" viewBox="0 0 24 24">
@@ -27,8 +27,8 @@ export default function Header({
             </svg>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="font-extrabold text-lg text-white tracking-tight">LeetCode</span>
-            <span className="font-extrabold text-lg text-[#ffa116]">Tracker</span>
+            <span className="font-black text-lg text-white tracking-tight">LeetCode</span>
+            <span className="font-black text-lg text-[#ffa116]">Tracker</span>
           </div>
         </div>
 
@@ -49,7 +49,7 @@ export default function Header({
                 className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${
                   isActive
                     ? 'bg-[#ffa116] text-black shadow-md shadow-[#ffa116]/20'
-                    : 'text-[#9e9e9e] hover:text-white hover:bg-[#282828]'
+                    : 'text-[#e5e7eb] hover:text-white hover:bg-[#282828]'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -59,13 +59,13 @@ export default function Header({
           })}
         </nav>
 
-        {/* Right Action Bar */}
+        {/* Right Action Controls */}
         <div className="flex items-center gap-3">
-          {/* Group Filter Selector */}
+          {/* Group Selector */}
           <select
             value={selectedGroupId || ''}
             onChange={(e) => setSelectedGroupId(e.target.value || null)}
-            className="bg-[#1a1a1a] text-gray-300 border border-[#3e3e3e] focus:border-[#ffa116] rounded-xl text-xs px-3 py-2 focus:outline-none"
+            className="bg-[#1a1a1a] text-white font-semibold border border-[#3e3e3e] focus:border-[#ffa116] rounded-xl text-xs px-3 py-2 focus:outline-none"
           >
             <option value="">All Groups</option>
             {groups.map((g) => (
@@ -75,11 +75,11 @@ export default function Header({
             ))}
           </select>
 
-          {/* Instant Sync Button */}
+          {/* Sync Button */}
           <button
             onClick={onSync}
             disabled={isSyncing}
-            className={`flex items-center gap-1.5 bg-[#ffa116]/10 text-[#ffa116] hover:bg-[#ffa116]/20 border border-[#ffa116]/30 text-xs px-3 py-2 rounded-xl font-bold transition-all ${
+            className={`flex items-center gap-1.5 bg-[#ffa116]/15 text-[#ffa116] hover:bg-[#ffa116]/25 border border-[#ffa116]/40 text-xs px-3 py-2 rounded-xl font-bold transition-all ${
               isSyncing ? 'animate-pulse opacity-75' : ''
             }`}
             title="Sync LeetCode Submissions"
@@ -91,7 +91,7 @@ export default function Header({
           {/* Activity Notifications Bell */}
           <button
             onClick={onOpenNotifications}
-            className="relative p-2 text-gray-400 hover:text-white bg-[#1a1a1a] border border-[#3e3e3e] rounded-xl transition-colors"
+            className="relative p-2 text-gray-200 hover:text-white bg-[#1a1a1a] border border-[#3e3e3e] rounded-xl transition-colors"
             title="Friend Solve Notifications"
           >
             <Bell className="w-4 h-4" />
@@ -102,7 +102,7 @@ export default function Header({
             )}
           </button>
 
-          {/* Active Logged-in User Profile Pill */}
+          {/* Active Profile Pill */}
           {currentUser && (
             <div className="flex items-center gap-2 pl-2 border-l border-[#3e3e3e]">
               <div className="flex items-center gap-2 bg-[#1a1a1a] border border-[#3e3e3e] px-3 py-1.5 rounded-xl">
@@ -111,13 +111,13 @@ export default function Header({
                 </div>
                 <div className="hidden sm:block text-xs text-left">
                   <div className="font-bold text-white leading-tight">{currentUser.display_name}</div>
-                  <div className="text-[10px] text-[#9e9e9e]">@{currentUser.leetcode_username}</div>
+                  <div className="text-[10px] text-[#e5e7eb] font-semibold">@{currentUser.leetcode_username}</div>
                 </div>
               </div>
 
               <button
                 onClick={onSwitchAccount}
-                className="p-2 text-gray-400 hover:text-rose-400 bg-[#1a1a1a] border border-[#3e3e3e] rounded-xl transition-colors"
+                className="p-2 text-gray-300 hover:text-rose-400 bg-[#1a1a1a] border border-[#3e3e3e] rounded-xl transition-colors"
                 title="Switch LeetCode Account"
               >
                 <LogOut className="w-3.5 h-3.5" />
