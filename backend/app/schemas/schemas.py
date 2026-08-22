@@ -38,6 +38,8 @@ class UserResponse(BaseModel):
 class UserProfileResponse(UserResponse):
     stats: Optional[UserStatsSchema] = None
     topic_breakdown: Dict[str, int] = {}
+    skills_breakdown: Dict[str, List[Dict[str, Any]]] = {}
+    languages_breakdown: List[Dict[str, Any]] = []
     recent_submissions_count: int = 0
 
 

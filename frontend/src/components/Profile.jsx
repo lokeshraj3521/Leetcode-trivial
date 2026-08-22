@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User as UserIcon, Zap, Flame, Award, Tag, CheckCircle2, Clock } from 'lucide-react';
+import { User as UserIcon, Zap, Flame, Award, Tag, CheckCircle2, Clock, Code, Cpu } from 'lucide-react';
 import Heatmap from './Heatmap';
 import { apiUsers, apiSubmissions } from '../services/api';
 
@@ -42,6 +42,9 @@ export default function Profile({ userId }) {
   const hardCount = stats.hard_count || 0;
   const totalSolved = easyCount + medCount + hardCount;
 
+  const skills = profile.skills_breakdown || {};
+  const languages = profile.languages_breakdown || [];
+
   return (
     <div className="space-y-6">
       {/* Bio Header Card */}
@@ -53,14 +56,14 @@ export default function Profile({ userId }) {
           <div>
             <h2 className="text-2xl font-black text-white flex items-center gap-3">
               {profile.display_name}
-              <span className="text-xs bg-[#ffa116]/20 text-[#ffa116] border border-[#ffa116]/40 px-3 py-1 rounded-full font-bold">
+              <span className="text-xs bg-[#ffa116]/20 text-[#ffa116] border border-[#ffa116]/40 px-3 py-1 rounded-full font-bold font-mono">
                 @{profile.leetcode_username}
               </span>
             </h2>
-            <p className="text-xs text-[#9e9e9e] mt-1 flex items-center gap-3">
+            <p className="text-xs text-[#d1d5db] mt-1 flex items-center gap-3 font-semibold">
               <span>Member since: {new Date(profile.created_at).toLocaleDateString()}</span>
               {profile.last_synced_at && (
-                <span className="flex items-center gap-1 text-[#9e9e9e]">
+                <span className="flex items-center gap-1 text-[#e5e7eb]">
                   <Clock className="w-3.5 h-3.5" /> Synced: {new Date(profile.last_synced_at).toLocaleTimeString()}
                 </span>
               )}
@@ -75,7 +78,7 @@ export default function Profile({ userId }) {
           </div>
           <div>
             <div className="text-2xl font-black text-white">{stats.total_points || 0}</div>
-            <div className="text-xs text-[#ffa116] font-bold">Total Earned Points</div>
+            <div className="text-xs text-[#ffa116] font-extrabold">Total Earned Points</div>
           </div>
         </div>
       </div>
@@ -85,7 +88,6 @@ export default function Profile({ userId }) {
         {/* Solved Donut Summary Card */}
         <div className="bg-[#282828] p-6 rounded-2xl border border-[#3e3e3e] flex items-center justify-around shadow-lg">
           <div className="relative w-32 h-32 flex items-center justify-center">
-            {/* Circular Progress Ring */}
             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
               <path
                 className="text-[#3e3e3e]"
@@ -96,7 +98,7 @@ export default function Profile({ userId }) {
               />
               <path
                 className="text-[#ffa116]"
-                strokeDasharray={`${Math.min(100, totalSolved * 5)}, 100`}
+                strokeDasharray={`${Math.min(100, (totalSolved / 4029) * 100 * 10)}, 100`}
                 strokeWidth="3.5"
                 strokeLinecap="round"
                 stroke="currentColor"
@@ -106,25 +108,25 @@ export default function Profile({ userId }) {
             </svg>
             <div className="absolute text-center">
               <div className="text-2xl font-black text-white">{totalSolved}</div>
-              <div className="text-[10px] uppercase font-bold text-[#9e9e9e]">Solved</div>
+              <div className="text-[10px] uppercase font-extrabold text-[#d1d5db]">SOLVED</div>
             </div>
           </div>
 
           <div className="space-y-2 text-xs font-bold">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-[#00b8a3]"></span>
-              <span className="text-[#9e9e9e]">Easy:</span>
-              <span className="text-white font-extrabold">{easyCount}</span>
+              <span className="text-[#d1d5db]">Easy:</span>
+              <span className="text-white font-extrabold text-sm">{easyCount}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-[#ffc01e]"></span>
-              <span className="text-[#9e9e9e]">Medium:</span>
-              <span className="text-white font-extrabold">{medCount}</span>
+              <span className="text-[#d1d5db]">Medium:</span>
+              <span className="text-white font-extrabold text-sm">{medCount}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-[#ff375f]"></span>
-              <span className="text-[#9e9e9e]">Hard:</span>
-              <span className="text-white font-extrabold">{hardCount}</span>
+              <span className="text-[#d1d5db]">Hard:</span>
+              <span className="text-white font-extrabold text-sm">{hardCount}</span>
             </div>
           </div>
         </div>
@@ -137,7 +139,7 @@ export default function Profile({ userId }) {
             </div>
             <div>
               <div className="text-3xl font-black text-white">{stats.current_streak || 0} Days</div>
-              <div className="text-xs text-orange-400 font-bold mt-1">Current Active Streak</div>
+              <div className="text-xs text-orange-400 font-extrabold mt-1">Current Active Streak</div>
             </div>
           </div>
         </div>
@@ -150,7 +152,7 @@ export default function Profile({ userId }) {
             </div>
             <div>
               <div className="text-3xl font-black text-white">{stats.longest_streak || 0} Days</div>
-              <div className="text-xs text-[#9e9e9e] font-bold mt-1">Longest Recorded Streak</div>
+              <div className="text-xs text-[#e5e7eb] font-extrabold mt-1">Longest Recorded Streak</div>
             </div>
           </div>
         </div>
@@ -159,75 +161,130 @@ export default function Profile({ userId }) {
       {/* 365-day Heatmap */}
       <Heatmap userId={userId} />
 
-      {/* Topic Breakdown & Recent AC Submissions Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Topic Tag Breakdown */}
+      {/* Authentic LeetCode Languages & Skills Section */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Languages Card */}
         <div className="bg-[#282828] p-6 rounded-2xl border border-[#3e3e3e] space-y-4 shadow-lg">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <Tag className="w-4 h-4 text-[#ffa116]" />
-            Topic Tag Breakdown
+            <Code className="w-4 h-4 text-[#ffa116]" />
+            Languages
           </h3>
-          {Object.keys(profile.topic_breakdown).length === 0 ? (
-            <p className="text-xs text-[#9e9e9e] italic">No topic tags recorded yet.</p>
+          {languages.length === 0 ? (
+            <p className="text-xs text-[#d1d5db] italic">No language statistics available.</p>
           ) : (
-            <div className="space-y-3 max-h-72 overflow-y-auto pr-2">
-              {Object.entries(profile.topic_breakdown)
-                .sort((a, b) => b[1] - a[1])
-                .map(([tag, count]) => (
-                  <div key={tag} className="space-y-1">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-gray-300">{tag}</span>
-                      <span className="text-[#ffa116]">{count} solved</span>
-                    </div>
-                    <div className="w-full bg-[#1a1a1a] h-2 rounded-full overflow-hidden border border-[#3e3e3e]">
-                      <div
-                        className="bg-[#ffa116] h-full rounded-full transition-all"
-                        style={{ width: `${Math.min(100, (count / (totalSolved || 1)) * 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                ))}
+            <div className="space-y-3">
+              {languages.map((lang, idx) => (
+                <div key={idx} className="flex items-center justify-between p-3 bg-[#1a1a1a] border border-[#3e3e3e] rounded-xl">
+                  <span className="text-xs font-bold text-gray-200 bg-[#282828] border border-[#3e3e3e] px-2.5 py-1 rounded-lg">
+                    {lang.languageName}
+                  </span>
+                  <span className="text-xs font-black text-white">
+                    {lang.problemsSolved} <span className="text-[11px] font-normal text-[#d1d5db]">problems solved</span>
+                  </span>
+                </div>
+              ))}
             </div>
           )}
         </div>
 
-        {/* Recent Submissions Feed */}
-        <div className="bg-[#282828] p-6 rounded-2xl border border-[#3e3e3e] space-y-4 shadow-lg">
+        {/* Skills Breakdown Card (Advanced, Intermediate, Fundamental) */}
+        <div className="md:col-span-2 bg-[#282828] p-6 rounded-2xl border border-[#3e3e3e] space-y-5 shadow-lg">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-[#00b8a3]" />
-            Recent Accepted Submissions
+            <Cpu className="w-4 h-4 text-[#ffa116]" />
+            LeetCode Official Skills Matrix
           </h3>
-          {submissions.length === 0 ? (
-            <p className="text-xs text-[#9e9e9e] italic">No recent submissions found.</p>
-          ) : (
-            <div className="space-y-3 max-h-72 overflow-y-auto pr-2">
-              {submissions.map((sub) => {
-                const diffColor =
-                  sub.difficulty === 'Easy'
-                    ? 'text-[#00b8a3]'
-                    : sub.difficulty === 'Medium'
-                    ? 'text-[#ffc01e]'
-                    : 'text-[#ff375f]';
-                return (
-                  <div key={sub.id} className="p-3.5 bg-[#1a1a1a] border border-[#3e3e3e] hover:border-[#ffa116]/50 rounded-xl flex items-center justify-between transition-colors">
-                    <div>
-                      <div className="font-bold text-xs text-white">{sub.problem_title}</div>
-                      <div className="text-[11px] text-[#9e9e9e] flex items-center gap-2 mt-1 font-semibold">
-                        <span className={diffColor}>{sub.difficulty}</span>
-                        <span>•</span>
-                        <span>{sub.language}</span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xs font-black text-[#ffa116]">+{sub.points_awarded} pts</div>
-                      <div className="text-[10px] text-[#9e9e9e] mt-0.5">{new Date(sub.submitted_at).toLocaleDateString()}</div>
+
+          <div className="space-y-4">
+            {/* Advanced Category */}
+            {skills.advanced && skills.advanced.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-xs font-extrabold text-rose-400 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-rose-500"></span> Advanced
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {skills.advanced.map((tag, idx) => (
+                    <span key={idx} className="bg-[#1a1a1a] border border-[#3e3e3e] hover:border-[#ffa116]/50 text-xs px-3 py-1.5 rounded-xl font-bold text-gray-200 flex items-center gap-1.5">
+                      <span>{tag.tagName}</span>
+                      <span className="text-[#ffa116] font-mono font-extrabold">x{tag.problemsSolved}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Intermediate Category */}
+            {skills.intermediate && skills.intermediate.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-xs font-extrabold text-amber-400 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-400"></span> Intermediate
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {skills.intermediate.map((tag, idx) => (
+                    <span key={idx} className="bg-[#1a1a1a] border border-[#3e3e3e] hover:border-[#ffa116]/50 text-xs px-3 py-1.5 rounded-xl font-bold text-gray-200 flex items-center gap-1.5">
+                      <span>{tag.tagName}</span>
+                      <span className="text-[#ffa116] font-mono font-extrabold">x{tag.problemsSolved}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Fundamental Category */}
+            {skills.fundamental && skills.fundamental.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-xs font-extrabold text-emerald-400 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span> Fundamental
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {skills.fundamental.map((tag, idx) => (
+                    <span key={idx} className="bg-[#1a1a1a] border border-[#3e3e3e] hover:border-[#ffa116]/50 text-xs px-3 py-1.5 rounded-xl font-bold text-gray-200 flex items-center gap-1.5">
+                      <span>{tag.tagName}</span>
+                      <span className="text-[#ffa116] font-mono font-extrabold">x{tag.problemsSolved}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Accepted Submissions List */}
+      <div className="bg-[#282828] p-6 rounded-2xl border border-[#3e3e3e] space-y-4 shadow-lg">
+        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-[#00b8a3]" />
+          Recent Accepted Submissions
+        </h3>
+        {submissions.length === 0 ? (
+          <p className="text-xs text-[#d1d5db] italic">No recent submissions found.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {submissions.map((sub) => {
+              const diffColor =
+                sub.difficulty === 'Easy'
+                  ? 'text-[#00b8a3]'
+                  : sub.difficulty === 'Medium'
+                  ? 'text-[#ffc01e]'
+                  : 'text-[#ff375f]';
+              return (
+                <div key={sub.id} className="p-3.5 bg-[#1a1a1a] border border-[#3e3e3e] hover:border-[#ffa116]/50 rounded-xl flex items-center justify-between transition-colors">
+                  <div>
+                    <div className="font-bold text-xs text-white">{sub.problem_title}</div>
+                    <div className="text-[11px] text-[#e5e7eb] flex items-center gap-2 mt-1 font-semibold">
+                      <span className={diffColor}>{sub.difficulty}</span>
+                      <span>•</span>
+                      <span>{sub.language}</span>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                  <div className="text-right">
+                    <div className="text-xs font-black text-[#ffa116]">+{sub.points_awarded} pts</div>
+                    <div className="text-[10px] text-[#d1d5db] mt-0.5">{new Date(sub.submitted_at).toLocaleDateString()}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

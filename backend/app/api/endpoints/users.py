@@ -60,7 +60,7 @@ async def list_users(db: AsyncSession = Depends(get_db)):
 
 @router.get("/{user_id}", response_model=UserProfileResponse)
 async def get_user_profile(user_id: str, db: AsyncSession = Depends(get_db)):
-    """Returns detailed user profile, stats, and topic breakdown."""
+    """Returns detailed user profile, stats, skills breakdown, and language stats directly from LeetCode."""
     stmt = select(User).where(User.id == user_id)
     res = await db.execute(stmt)
     user = res.scalar_one_or_none()
@@ -79,10 +79,14 @@ async def get_user_profile(user_id: str, db: AsyncSession = Depends(get_db)):
     res_subs = await db.execute(stmt_subs)
     submissions = res_subs.scalars().all()
 
+    # Local topic breakdown
     topic_breakdown: Dict[str, int] = {}
     for sub in submissions:
         for tag in sub.topic_tags or []:
             topic_breakdown[tag] = topic_breakdown.get(tag, 0) + 1
+
+    # Fetch live skills & languages directly from LeetCode GraphQL
+    skills_data = await leetcode_service.fetch_user_skills_and_languages(user.leetcode_username)
 
     return UserProfileResponse(
         id=user.id,
@@ -94,6 +98,8 @@ async def get_user_profile(user_id: str, db: AsyncSession = Depends(get_db)):
         is_active=user.is_active,
         stats=stats,
         topic_breakdown=topic_breakdown,
+        skills_breakdown=skills_data.get("skills", {}),
+        languages_breakdown=skills_data.get("languages", []),
         recent_submissions_count=len(submissions),
     )
 

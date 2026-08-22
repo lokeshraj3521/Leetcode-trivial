@@ -36,6 +36,32 @@ query getUserProfile($username: String!) {
 }
 """
 
+# GraphQL Query for User Skills (Advanced, Intermediate, Fundamental) & Languages
+SKILLS_AND_LANGUAGES_QUERY = """
+query skillAndLanguageStats($username: String!) {
+    matchedUser(username: $username) {
+        tagProblemCounts {
+            advanced {
+                tagName
+                problemsSolved
+            }
+            intermediate {
+                tagName
+                problemsSolved
+            }
+            fundamental {
+                tagName
+                problemsSolved
+            }
+        }
+        languageProblemCount {
+            languageName
+            problemsSolved
+        }
+    }
+}
+"""
+
 # GraphQL Query for Question Metadata (Difficulty, Topic Tags)
 QUESTION_DETAIL_QUERY = """
 query questionData($titleSlug: String!) {
@@ -63,14 +89,51 @@ class LeetCodeService:
         }
         self._problem_cache: Dict[str, Dict[str, Any]] = {}
 
-    async def fetch_user_profile_stats(self, username: str) -> Dict[str, Any]:
+    async def fetch_user_skills_and_languages(self, username: str) -> Dict[str, Any]:
         """
-        Fetches 100% REAL overall lifetime solve statistics (65 Solved: 47 Easy, 18 Medium, 0 Hard)
-        directly from LeetCode user profile APIs.
+        Dynamically queries LeetCode GraphQL for real Skills breakdown (Advanced, Intermediate, Fundamental)
+        and Language statistics for any username without hardcoding.
         """
         clean_user = username.strip()
+        payload = {
+            "query": SKILLS_AND_LANGUAGES_QUERY,
+            "variables": {"username": clean_user},
+        }
 
-        # Method 1: Query alfa-leetcode-api userProfile service
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                await asyncio.sleep(0.1)
+                response = await client.post(self.graphql_url, json=payload, headers=self.headers)
+                if response.status_code == 200:
+                    data = response.json()
+                    mu = data.get("data", {}).get("matchedUser")
+                    if mu:
+                        tag_counts = mu.get("tagProblemCounts") or {}
+                        lang_counts = mu.get("languageProblemCount") or []
+
+                        skills = {
+                            "advanced": tag_counts.get("advanced") or [],
+                            "intermediate": tag_counts.get("intermediate") or [],
+                            "fundamental": tag_counts.get("fundamental") or [],
+                        }
+
+                        # Sort languages by problemsSolved descending
+                        sorted_langs = sorted(lang_counts, key=lambda x: x.get("problemsSolved", 0), reverse=True)
+
+                        logger.info(f"Fetched live skills and languages for '{clean_user}' directly from LeetCode GraphQL.")
+                        return {
+                            "skills": skills,
+                            "languages": sorted_langs,
+                        }
+        except Exception as e:
+            logger.warning(f"Failed to fetch skills/languages for '{clean_user}' from LeetCode: {e}")
+
+        return {"skills": {"advanced": [], "intermediate": [], "fundamental": []}, "languages": []}
+
+    async def fetch_user_profile_stats(self, username: str) -> Dict[str, Any]:
+        """Fetches 100% REAL overall lifetime solve statistics directly from LeetCode user profile APIs."""
+        clean_user = username.strip()
+
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 url = f"{self.alfa_api_url}/userProfile/{clean_user}"
@@ -82,7 +145,6 @@ class LeetCodeService:
                     med = data.get("mediumSolved", 0)
                     hard = data.get("hardSolved", 0)
 
-                    # Fallback check inside matchedUserStats
                     if total == 0 and "matchedUserStats" in data:
                         ac_nums = data.get("matchedUserStats", {}).get("acSubmissionNum", [])
                         for item in ac_nums:
@@ -104,7 +166,7 @@ class LeetCodeService:
                         except Exception:
                             sub_cal = {}
 
-                    result = {
+                    return {
                         "totalSolved": total,
                         "easySolved": easy,
                         "mediumSolved": med,
@@ -112,12 +174,9 @@ class LeetCodeService:
                         "ranking": data.get("ranking", 0),
                         "submissionCalendar": sub_cal,
                     }
-                    logger.info(f"Fetched real overall profile stats for '{clean_user}': {result}")
-                    return result
         except Exception as e:
             logger.warning(f"alfa-api userProfile fetch failed for '{clean_user}': {e}. Trying GraphQL.")
 
-        # Method 2: Fallback to LeetCode GraphQL
         try:
             payload = {
                 "query": USER_PROFILE_STATS_QUERY,
@@ -234,7 +293,6 @@ class LeetCodeService:
                                 "language": detail.get("language", "python3"),
                                 "submitted_at": submitted_dt,
                             })
-                        logger.info(f"Fetched {len(enriched)} real AC submissions for '{clean_user}' via GraphQL.")
                         return enriched
         except Exception as e:
             logger.warning(f"GraphQL fetch failed for '{clean_user}': {e}.")
@@ -299,33 +357,14 @@ class LeetCodeService:
         except Exception:
             pass
 
-        fallback = self._get_fallback_problem_detail(title_slug)
-        self._problem_cache[title_slug] = fallback
-        return fallback
-
-    def _get_fallback_problem_detail(self, title_slug: str) -> Dict[str, Any]:
-        known_problems = {
-            "two-sum": {"title": "Two Sum", "difficulty": "Easy", "topic_tags": ["Array", "Hash Table"]},
-            "count-primes": {"title": "Count Primes", "difficulty": "Medium", "topic_tags": ["Array", "Math", "Number Theory", "Primality Test"]},
-            "palindrome-number": {"title": "Palindrome Number", "difficulty": "Easy", "topic_tags": ["Math"]},
-            "remove-duplicates-from-sorted-array": {"title": "Remove Duplicates from Sorted Array", "difficulty": "Easy", "topic_tags": ["Array", "Two Pointers"]},
-            "check-if-array-is-sorted-and-rotated": {"title": "Check if Array Is Sorted and Rotated", "difficulty": "Easy", "topic_tags": ["Array"]},
-            "add-two-numbers": {"title": "Add Two Numbers", "difficulty": "Medium", "topic_tags": ["Linked List", "Math"]},
-            "longest-substring-without-repeating-characters": {"title": "Longest Substring Without Repeating Characters", "difficulty": "Medium", "topic_tags": ["Hash Table", "Sliding Window"]},
-            "container-with-most-water": {"title": "Container With Most Water", "difficulty": "Medium", "topic_tags": ["Array", "Two Pointers"]},
-            "trapping-rain-water": {"title": "Trapping Rain Water", "difficulty": "Hard", "topic_tags": ["Array", "Two Pointers", "Dynamic Programming"]},
-        }
-        if title_slug in known_problems:
-            p = known_problems[title_slug]
-            p["language"] = "python3"
-            return p
-
-        return {
+        fallback = {
             "title": title_slug.replace("-", " ").title(),
             "difficulty": "Medium",
             "topic_tags": ["Algorithms"],
             "language": "python3",
         }
+        self._problem_cache[title_slug] = fallback
+        return fallback
 
 
 leetcode_service = LeetCodeService()
