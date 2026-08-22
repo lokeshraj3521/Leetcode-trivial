@@ -29,48 +29,54 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 @router.post("/register", response_model=UserProfileResponse, status_code=status.HTTP_201_CREATED)
 async def register(user_in: UserRegister, db: AsyncSession = Depends(get_db)):
-    """Registers a new account, verifies LeetCode username, hashes password, and saves optional phone number."""
+    """Registers or updates a user account with password, phone number, and display name."""
     clean_username = user_in.leetcode_username.strip()
 
-    # 1. Case-insensitive check if user already exists
+    # Case-insensitive check if user exists
     stmt = select(User).where(func.lower(User.leetcode_username) == clean_username.lower())
     res = await db.execute(stmt)
-    if res.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Account for LeetCode username '{clean_username}' already exists. Please sign in.",
-        )
+    existing_user = res.scalar_one_or_none()
 
-    # 2. Verify username validity on LeetCode
-    profile_stats = await leetcode_service.fetch_user_profile_stats(clean_username)
-    if profile_stats.get("totalSolved") == 0 and profile_stats.get("easySolved") == 0:
-        recent = await leetcode_service.fetch_recent_ac_submissions(clean_username, limit=1)
-        if not recent:
-            cal = await leetcode_service.fetch_user_calendar(clean_username)
-            if not cal.get("submissionCalendar") and not cal.get("activeYears"):
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"LeetCode user '{clean_username}' not found. Please check spelling.",
-                )
-
-    # 3. Create user
     pw_hash = hash_password(user_in.password)
-    user = User(
-        leetcode_username=clean_username,
-        display_name=user_in.display_name.strip(),
-        email=user_in.email,
-        phone_number=user_in.phone_number.strip() if user_in.phone_number else None,
-        password_hash=pw_hash,
-        created_at=datetime.utcnow(),
-    )
-    db.add(user)
-    await db.flush()
 
-    stats = UserStats(user_id=user.id)
-    db.add(stats)
-    await db.flush()
+    if existing_user:
+        # If user exists, update their details (password, display_name, phone_number, email)
+        if user_in.display_name:
+            existing_user.display_name = user_in.display_name.strip()
+        if user_in.email:
+            existing_user.email = user_in.email.strip()
+        if user_in.phone_number:
+            existing_user.phone_number = user_in.phone_number.strip()
+        existing_user.password_hash = pw_hash
+        user = existing_user
+    else:
+        # Verify username validity on LeetCode for brand new user
+        profile_stats = await leetcode_service.fetch_user_profile_stats(clean_username)
+        if profile_stats.get("totalSolved") == 0 and profile_stats.get("easySolved") == 0:
+            recent = await leetcode_service.fetch_recent_ac_submissions(clean_username, limit=1)
+            if not recent:
+                cal = await leetcode_service.fetch_user_calendar(clean_username)
+                if not cal.get("submissionCalendar") and not cal.get("activeYears"):
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"LeetCode user '{clean_username}' not found. Please check spelling.",
+                    )
 
-    # Initial live sync
+        user = User(
+            leetcode_username=clean_username,
+            display_name=user_in.display_name.strip(),
+            email=user_in.email.strip() if user_in.email else None,
+            phone_number=user_in.phone_number.strip() if user_in.phone_number else None,
+            password_hash=pw_hash,
+            created_at=datetime.utcnow(),
+        )
+        db.add(user)
+        await db.flush()
+
+        stats = UserStats(user_id=user.id)
+        db.add(stats)
+        await db.flush()
+
     raw_subs = await leetcode_service.fetch_recent_ac_submissions(clean_username, limit=20)
     if raw_subs:
         await points_service.process_new_submissions(db, user.id, raw_subs)
@@ -104,8 +110,6 @@ async def register(user_in: UserRegister, db: AsyncSession = Depends(get_db)):
 async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)):
     """Authenticates username and password, persisting session."""
     clean_username = credentials.leetcode_username.strip()
-    
-    # Case-insensitive query
     stmt = select(User).where(func.lower(User.leetcode_username) == clean_username.lower())
     res = await db.execute(stmt)
     user = res.scalar_one_or_none()
@@ -124,10 +128,8 @@ async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)):
                 detail="Incorrect password. Please check your password.",
             )
     else:
-        # First login set password
         user.password_hash = hash_password(credentials.password)
 
-    # Refresh user stats
     updated_stats = await points_service.update_user_stats(db, user.id)
     user.last_synced_at = datetime.utcnow()
     await db.commit()
